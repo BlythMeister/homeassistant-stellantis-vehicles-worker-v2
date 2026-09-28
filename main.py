@@ -20,9 +20,11 @@ playwright = None
 browser = None
 browser_lock = asyncio.Lock()
 
-def log_process(message, process_id, force=force_debug):
+def log_process(message, process_id, force=None):
+    if force is None:
+        force = force_debug
     if force:
-        print(f"[{process_id}] {message}")
+        print(f"[{process_id}] {message}", flush=True)
 
 def log_start_process(process_id):
     global process_start
