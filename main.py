@@ -3,6 +3,7 @@ import asyncio
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from playwright.async_api import async_playwright
+from urllib.parse import parse_qs, urlparse
 import uuid
 
 app = FastAPI()
@@ -102,7 +103,7 @@ def http_response(message, process_id, status=400):
     else:
         ko_count += 1
         body = {"message": f"{message} [{process_id}]", "code": status}
-        log_process(f"Response: {message}", process_id)
+        log_process(f"Response: {message}", process_id, True)
 
     log_end_process(process_id)
 
@@ -125,6 +126,7 @@ async def fetch(request: Request):
     log_start_process(process_id)
     context = None
     captured_code = None
+    code_captured = asyncio.Event()
 
     try:
         payload = await request.json()
@@ -171,11 +173,10 @@ async def fetch(request: Request):
                 nonlocal captured_code
                 if req.url.startswith("mym"):
                     try:
-                        query = req.url.split("?", 1)[1]
-                        params = dict(p.split("=") for p in query.split("&"))
-                        code = params.get("code")
+                        code = parse_qs(urlparse(req.url).query).get("code", [None])[0]
                         if code:
                             captured_code = code
+                            code_captured.set()
                             log_process("Code captured!", process_id)
                     except Exception as e:
                         log_process(f"URL parse error: {e}", process_id)
@@ -221,7 +222,7 @@ async def fetch(request: Request):
 
             log_process("Waiting for code capture...", process_id)
             await asyncio.wait_for(
-                asyncio.to_thread(lambda: captured_code),
+                code_captured.wait(),
                 timeout=timeout_page / 1000
             )
 
@@ -244,6 +245,7 @@ async def fetch(request: Request):
 
         return http_response(str(e), process_id)
 
+@app.get("/")
 @app.get("/health")
 async def healthcheck():
     global playwright, browser
