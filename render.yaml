@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: stellantis-playwright-worker
+    name: stellantis-auth-blythmeister
     env: docker
     plan: free
     autoDeploy: true
